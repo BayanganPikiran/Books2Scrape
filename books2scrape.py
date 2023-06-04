@@ -51,3 +51,10 @@ def get_book_url(book_title_tags):
             if links not in book_url:
                 book_url.append(links)
     return book_url
+
+
+def get_doc(doc):
+    # Checks HTTP request success, returns Exception if failed, returns content if success
+    if result.status_code != 200:
+        raise Exception('Failed to load page {}'.format(result))
+    return content
