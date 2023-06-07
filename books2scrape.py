@@ -49,12 +49,6 @@ def get_book_price(doc):
     return book_prices
 
 
-def get_stock_availability(doc):
-    book_stock_tags = soup.find_all('p', class_='stock_availability')
-    book_stock = [tags.text.strip() for tags in book_stock_tags]
-    return book_stock
-
-
 def get_star_rating(doc):
     star_rating_tags = soup.find_all('p', class_='star-rating')
     star_rating = [tags['class'][1] for tags in star_rating_tags]
