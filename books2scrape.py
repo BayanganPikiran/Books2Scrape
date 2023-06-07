@@ -6,33 +6,30 @@ from pydrive.drive import GoogleDrive
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
-import csv
-import os
+import auth
 
 SHEET_KEY = '1qPEMGkScpA8OCOgqjUhVhyXIiaG8TXjiUsi8doXUjj8'
+SHEET_URL = 'https://docs.google.com/spreadsheets/d/1qPEMGkScpA8OCOgqjUhVhyXIiaG8TXjiUsi8doXUjj8/edit#gid=0'
 
 # Set up migration of data to Google Sheets
 scopes = ['https://www.googleapis.com/auth/spreadsheets',
           'https://www.googleapis.com/auth/drive']
 
-credentials = Credentials.from_service_account_file('book_scrape_oauth.json')
+# filename contains key located in separate file
+credentials = Credentials.from_service_account_file(filename=auth.project_key, scopes=scopes)
 gc = gspread.authorize(credentials)
 
 gauth = GoogleAuth()
 drive = GoogleDrive(gauth)
 
 # Open a Google sheet
-gs = gc.open_by_key(SHEET_KEY)
-worksheet1 = gs.worksheet('Sheet1')
+gs = gc.open_by_url(SHEET_URL)
+worksheet1 = gs.worksheet('books2scrape')
 
 # Download the webpage using requests
 website = "https://books.toscrape.com/"
 result = requests.get(website)
 content = result.text
-
-# Create a file and load contents into it
-with open('Bookswebpage.html', 'w') as file:
-    file.write(content)
 
 # Use BeautifulSoup to parse and extract info
 soup = BeautifulSoup(content, 'lxml')
@@ -85,25 +82,27 @@ def get_doc(doc):
 def scrape_multiple_pages(page_num):
     # Scrapes pages and returns a Pandas dataframe
     url = 'https://books.toscrape.com/catalogue/page-'
-    titles, prices, stock_availability, stars, urls = [], [], [], [], []
+    titles, prices, stars, urls = [], [], [], []
 
     for page in range(1, page_num + 1):
         doc = get_doc(url + str(page) + '.html')
         titles.extend(get_book_titles(doc))
         prices.extend(get_book_price(doc))
-        stock_availability.extend(get_stock_availability(doc))
         stars.extend(get_star_rating(doc))
         urls.extend(get_book_url(book_title_tags))
 
     book_dictionary = {
         'Title': titles,
         'Price': prices,
-        'Stock Availability': stock_availability,
         'Star Rating': stars,
         'URL': urls
     }
 
-    return pd.DataFrame(book_dictionary)
+    # create df w/ keys as rows so no ValueError raised on missing values
+    df = pd.DataFrame.from_dict(book_dictionary, orient='index')
+    # df transposed to bring back to wanted format
+    final_dataframe = df.transpose()
+    return final_dataframe
 
 
 def convert_to_csv(page_num):
@@ -111,7 +110,15 @@ def convert_to_csv(page_num):
     return scrape_csv
 
 
-def write_csv(path, data):
-    with open(path, 'w') as csv_file:
-        writer = csv.writer(csv_file)
-        writer.writerow(data)
+def write_df_to_sheet(df):
+    # clears all cells in the sheet
+    worksheet1.clear()
+    # write to dataframe
+    set_with_dataframe(worksheet=worksheet1, dataframe=df, include_index=False, include_column_header=True, resize=True)
+
+
+# executes scrape and stores data in a csv and uploads to Google Sheets
+convert_to_csv(50)
+
+sheets_input = scrape_multiple_pages(50)
+write_df_to_sheet(sheets_input)
